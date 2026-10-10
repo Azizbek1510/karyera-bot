@@ -1,12 +1,12 @@
 """Bitta ishga tushirish sikli (GitHub Actions har ~10 daqiqada chaqiradi):
 1) admin tugmalari va tahrirlarni qayta ishlash;
-2) osonish.uz'dan yangi Namangan vakansiyalarini olib, admin chatga tekshiruvga yuborish.
+2) osonish.uz'dan tanlangan viloyatlar vakansiyalarini olib, admin chatga tekshiruvga yuborish.
 
 Ishlatish:
   python run.py                 # oddiy sikl
   python run.py --test 116052   # bitta vakansiyani tahlil qilib, matnini chiqarish (Telegramsiz)
 """
-import json, os, sys, tempfile, traceback
+import json, os, sys, tempfile, time, traceback
 import osonish, post, card, tg
 
 STATE_FILE = os.environ.get("STATE_FILE", "state.json")
@@ -15,13 +15,16 @@ CHANNEL = os.environ.get("CHANNEL_ID", "@karyerauznamangan")
 MAX_FETCH = int(os.environ.get("MAX_FETCH", "350"))        # bir siklda ko'riladigan max sahifa
 INITIAL_SCAN = int(os.environ.get("INITIAL_SCAN", "300"))  # birinchi ishga tushishda oxirgi N ta e'lon
 CAPTION_LIMIT = 1024
+LISTEN_SECONDS = int(os.environ.get("LISTEN_SECONDS", "480"))  # tugmalarni tez qayta ishlash uchun tinglash vaqti
+DEFAULT_REGIONS = ["namangan"]
+SETTINGS_BTN = "⚙️ Viloyatlar"
 
 def load():
     try:
         with open(STATE_FILE) as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"last_id": None, "offset": 0, "posts": {}, "awaiting": {}}
+        return {"last_id": None, "offset": 0, "posts": {}, "awaiting": {}, "regions": list(DEFAULT_REGIONS)}
 
 def save(st):
     # eski yakunlangan postlarni tozalash (fayl o'sib ketmasin)
@@ -41,9 +44,50 @@ def _safe(fn, *a, **k):
     except Exception as e:
         print("XATO:", e)
 
+# ---------- 0. Viloyatlar sozlamasi ----------
+def _regions(st):
+    return st.setdefault("regions", list(DEFAULT_REGIONS))
+
+def regions_kb(st):
+    on = set(_regions(st))
+    rows = [[{"text": f"{name}: " + ("✅ Ha" if key in on else "❌ Yo'q"),
+              "callback_data": f"rg:{key}"}] for key, (name, _) in sorted(osonish.REGIONS.items(), key=lambda kv: kv[0] != "namangan")]
+    rows.append([{"text": "✅ Hammasi — Ha", "callback_data": "rg:*all"},
+                 {"text": "❌ Hammasi — Yo'q", "callback_data": "rg:*none"}])
+    rows.append([{"text": "💾 Saqlash", "callback_data": "rg:*done"}])
+    return {"inline_keyboard": rows}
+
+def regions_text(st):
+    on = _regions(st)
+    return ("⚙️ <b>Viloyatlar sozlamasi</b>\n\n"
+            "Qaysi viloyat e'lonlari kelsin? Viloyat tugmasini bosib <b>Ha / Yo'q</b> ni almashtiring.\n"
+            f"Hozir yoqilgan: <b>{len(on)}</b> ta.")
+
+def show_regions(st):
+    tg.call("sendMessage", chat_id=ADMIN_CHAT, text=regions_text(st), parse_mode="HTML",
+            reply_markup=regions_kb(st))
+
+def on_region_button(st, q, key):
+    regs = _regions(st)
+    msg_id = q["message"]["message_id"]
+    if key == "*all":
+        regs[:] = list(osonish.REGIONS)
+    elif key == "*none":
+        regs.clear()
+    elif key == "*done":
+        names = [osonish.REGIONS[k][0] for k in osonish.REGIONS if k in regs]
+        txt = ("✅ <b>Saqlandi.</b> Endi quyidagi viloyatlar e'lonlari keladi:\n• " + "\n• ".join(names)) if names \
+            else "⚠️ <b>Saqlandi, lekin birorta viloyat tanlanmagan</b> — yangi e'lonlar kelmaydi."
+        tg.call("editMessageText", chat_id=ADMIN_CHAT, message_id=msg_id, text=txt, parse_mode="HTML")
+        return
+    elif key in osonish.REGIONS:
+        regs.remove(key) if key in regs else regs.append(key)
+    tg.call("editMessageText", chat_id=ADMIN_CHAT, message_id=msg_id, text=regions_text(st),
+            parse_mode="HTML", reply_markup=regions_kb(st))
+
 # ---------- 1. Admin harakatlari ----------
-def handle_updates(st):
-    ups = tg.call("getUpdates", offset=st["offset"], timeout=0,
+def handle_updates(st, wait=0):
+    ups = tg.call("getUpdates", offset=st["offset"], timeout=wait,
                   allowed_updates=["callback_query", "message"])
     for u in ups:
         st["offset"] = u["update_id"] + 1
@@ -60,8 +104,10 @@ def on_button(st, q):
     if str(msg.get("chat", {}).get("id")) != str(ADMIN_CHAT):
         return
     act, _, vid = q.get("data", "").partition(":")
-    p = st["posts"].get(vid)
     _safe(tg.call, "answerCallbackQuery", callback_query_id=q["id"])
+    if act == "rg":
+        return on_region_button(st, q, vid)
+    p = st["posts"].get(vid)
     if not p or p["status"] != "pending":
         return
     who = q["from"].get("first_name", "admin")
@@ -95,6 +141,16 @@ def on_button(st, q):
 def on_message(st, m):
     if str(m.get("chat", {}).get("id")) != str(ADMIN_CHAT):
         return
+    t = (m.get("text") or "").strip()
+    if t.startswith("/start"):
+        tg.call("sendMessage", chat_id=ADMIN_CHAT,
+                text="Assalomu alaykum! Men yangi vakansiyalarni tekshiruvga yuboraman.\n"
+                     "Viloyatlarni sozlash uchun pastdagi «⚙️ Viloyatlar» tugmasini bosing.",
+                reply_markup={"keyboard": [[{"text": SETTINGS_BTN}]], "resize_keyboard": True,
+                              "is_persistent": True})
+        return
+    if t == SETTINGS_BTN or t.startswith("/viloyatlar"):
+        return show_regions(st)
     rep = m.get("reply_to_message")
     if not rep or str(rep["message_id"]) not in st["awaiting"]:
         return
@@ -134,14 +190,15 @@ def scrape(st):
             print(f"{vid}: o'tkazildi ({e})")
             st["last_id"] = vid
             continue
-        st["last_id"] = vid
-        if not v["is_region"] or str(vid) in st["posts"]:
+        if v.get("region_key") not in _regions(st) or str(vid) in st["posts"]:
+            st["last_id"] = vid
             continue
         caption = post.build_text(v)
         m = tg.send_photo(ADMIN_CHAT, _img(v, 0), caption, tg.review_kb(vid))
         st["posts"][str(vid)] = {"msg_id": m["message_id"], "status": "pending", "variant": 0,
                                  "caption": m.get("caption", caption), "entities": m.get("caption_entities"),
                                  "v": v}
+        st["last_id"] = vid  # faqat muvaffaqiyatli yuborilgandan keyin
         save(st)  # har postdan keyin saqlash — uzilib qolsa ham takrorlanmaydi
         print(f"{vid}: tekshiruvga yuborildi — {v['title']}")
 
@@ -157,11 +214,20 @@ def main():
         return
     assert tg.TOKEN and ADMIN_CHAT, "BOT_TOKEN va ADMIN_CHAT_ID sozlanmagan"
     st = load()
+    _regions(st)
+    _safe(tg.call, "setMyCommands", commands=[
+        {"command": "viloyatlar", "description": "Viloyatlarni sozlash (Ha/Yo'q)"},
+        {"command": "start", "description": "Botni ishga tushirish"}])
+    start = time.time()
     try:
         handle_updates(st)
         save(st)
         scrape(st)
-        handle_updates(st)  # skrayping vaqtida bosilgan tugmalar ham ishlansin
+        save(st)
+        # Qolgan vaqtda tugmalarni deyarli darhol qayta ishlash uchun tinglab turamiz
+        while time.time() - start < LISTEN_SECONDS:
+            handle_updates(st, wait=min(25, max(1, int(LISTEN_SECONDS - (time.time() - start)))))
+            save(st)
     finally:
         save(st)
 

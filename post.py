@@ -14,6 +14,12 @@ def _sched(s):
 def _edu(s):
     return re.sub(r"\s*\(", " (", s or "Ahamiyatsiz")
 
+def _place(v):
+    reg, dist = v.get("region") or "", v.get("district") or ""
+    if reg and dist and reg.split()[0].lower() not in dist.lower():
+        return f"{reg}, {dist}"
+    return dist or reg or "O'zbekiston"
+
 def build_text(v):
     e = lambda s: html.escape(str(s), quote=False)
     contact = ", ".join(x for x in [v.get("contact_name"), ", ".join(v.get("phones", [])[:2])] if x) or "osonish.uz orqali"
@@ -21,7 +27,7 @@ def build_text(v):
         f"🎓 <b>{e(v['title'].upper())}</b>",
         "",
         f"🏢 {e(v.get('org') or '—')}",
-        f"📍 {e(v.get('district') or 'Namangan viloyati')}",
+        f"📍 {e(_place(v))}",
         f"👥 Bo'sh o'rinlar: {v.get('slots', 1)} ta",
         f"🎓 Ma'lumot: {e(_edu(v.get('education')))}",
         f"⏳ Tajriba: {e((v.get('experience') or 'Talab etilmaydi').replace('-', '–'))}",

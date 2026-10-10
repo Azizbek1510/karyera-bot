@@ -1,5 +1,5 @@
 """osonish.uz'dan vakansiyalarni olish (faqat ochiq sahifalar; /api/ ishlatilmaydi — robots.txt)."""
-import re, time, datetime as dt
+import os, re, time, datetime as dt
 import requests
 from bs4 import BeautifulSoup
 
@@ -7,9 +7,54 @@ BASE = "https://osonish.uz"
 UA = {"User-Agent": "KaryeraUzBot/1.0 (+https://t.me/karyerauznamangan)"}
 DELAY = 1.2  # robots.txt: Crawl-delay 1
 
-REGION_KEYS = ["namangan", "наманган"]
-NAMANGAN_DISTRICTS = ["namangan", "chust", "chortoq", "kosonsoy", "mingbuloq", "norin", "pop tumani",
-                      "to'raqo'rg'on", "uchqo'rg'on", "uychi", "yangiqo'rg'on", "davlatobod"]
+# Viloyatlar: kalit -> (postdagi nomi, manzilda qidiriladigan so'zlar). Tartib muhim:
+# Toshkent shahri Toshkent viloyatidan oldin tekshiriladi.
+REGIONS = {
+    "toshkent_sh":  ("Toshkent shahri",            ["город ташкент", "г. ташкент", "ташкент шаҳри", "toshkent shahri", "tashkent city"]),
+    "toshkent_v":   ("Toshkent viloyati",          ["ташкентская", "тошкент вилоят", "toshkent viloyati"]),
+    "qoraqalpog":   ("Qoraqalpog'iston Respublikasi", ["каракалпак", "қорақалпоғ", "qoraqalpog"]),
+    "andijon":      ("Andijon viloyati",           ["андижан", "андижон", "andijon"]),
+    "buxoro":       ("Buxoro viloyati",            ["бухар", "buxoro"]),
+    "jizzax":       ("Jizzax viloyati",            ["джизак", "жиззах", "jizzax"]),
+    "qashqadaryo":  ("Qashqadaryo viloyati",       ["кашкадар", "қашқадар", "qashqadaryo"]),
+    "navoiy":       ("Navoiy viloyati",            ["навои", "navoiy"]),
+    "namangan":     ("Namangan viloyati",          ["наманган", "namangan"]),
+    "samarqand":    ("Samarqand viloyati",         ["самарканд", "самарқанд", "samarqand"]),
+    "surxondaryo":  ("Surxondaryo viloyati",       ["сурхандар", "сурхондар", "surxondaryo"]),
+    "sirdaryo":     ("Sirdaryo viloyati",          ["сырдар", "сирдар", "sirdaryo"]),
+    "fargona":      ("Farg'ona viloyati",          ["ферган", "фарғона", "farg'ona", "fergana"]),
+    "xorazm":       ("Xorazm viloyati",            ["хорезм", "хоразм", "xorazm"]),
+}
+# Qaysi viloyatlar olinadi: "all" (hammasi) yoki vergul bilan kalitlar, masalan "namangan,andijon"
+ALLOWED_REGIONS = os.environ.get("REGIONS", "all").strip().lower() or "all"
+
+def detect_region(address, district=""):
+    a = address.lower()
+    for key, (name, kws) in REGIONS.items():
+        if any(k in a for k in kws):
+            return key, name
+    if any(d in district.lower() for d in NAMANGAN_DISTRICTS):
+        return "namangan", REGIONS["namangan"][0]
+    return None, ""
+
+def region_allowed(key):
+    if ALLOWED_REGIONS == "all":
+        return True
+    return key in [x.strip() for x in ALLOWED_REGIONS.split(",")]
+
+NAMANGAN_DISTRICTS = [
+    # shahar va tumanlar (lotin, kirill, rus yozuvlarida)
+    "namangan", "наманган", "davlatobod", "давлатабад", "давлатобод",
+    "chust", "чуст", "chortoq", "chartak", "чартак", "чортоқ",
+    "kosonsoy", "kasansay", "касансай", "косонсой",
+    "mingbuloq", "mingbulak", "мингбулак", "мингбулоқ",
+    "norin", "naryn", "нарын", "норин",
+    "pop tumani", "pop shahri", "папский", "пап ", "поп тумани",
+    "to'raqo'rg'on", "turakurgan", "туракурган", "тўрақўрғон",
+    "uchqo'rg'on", "uchkurgan", "учкурган", "учқўрғон",
+    "uychi", "uychin", "уйчи", "уйчин",
+    "yangiqo'rg'on", "yangikurgan", "янгикурган", "янгиқўрғон",
+]
 
 def _get(url):
     r = requests.get(url, headers=UA, timeout=30)
@@ -107,8 +152,8 @@ def parse_vacancy(html, vid, today=None):
         v["slots"] = int(re.sub(r"\D", "", v["slots"]) or 1)
     except ValueError:
         v["slots"] = 1
-    v["is_region"] = any(k in v["address"].lower() for k in REGION_KEYS) or \
-        any(d in v["district"].lower() for d in NAMANGAN_DISTRICTS)
+    v["region_key"], v["region"] = detect_region(v["address"], v["district"])
+    v["is_region"] = v["region_key"] is not None
     return v
 
 def fetch_vacancy(vid):
