@@ -1,6 +1,62 @@
 {
- "last_id": 116234,
- "offset": 0,
- "posts": {},
+ "last_id": 116281,
+ "offset": 596549655,
+ "posts": {
+  "116281": {
+   "msg_id": 9,
+   "status": "pending",
+   "variant": 0,
+   "caption": "🎓 MUSIQA FANIDAN MAKTAB O'QITUVCHISI\n\n🏢 \"to'raqo'rg'on Tuman Maktabgacha Va Maktab Ta'limi Bo'limiga Qarashli 20-Sonli Umumiy O'rta Ta'lim Maktabi\" Davlat Muassasasi\n📍 To'raqo'rg'on tumani\n👥 Bo'sh o'rinlar: 1 ta\n🎓 Ma'lumot: Oliy (bakalavr)\n⏳ Tajriba: 1–3 yil\n💰 Maosh: 1 500 000 so'm\n📋 Ish turi: doimiy (shtat asosida)\n🕗 Ish tartibi: haftasiga 6 kun ish, 1 kun dam\n📞 Bog'lanish: osonish.uz orqali\n🗓 E'lon sanasi: 10.10.2026\n\n📝 Ariza topshirish: https://osonish.uz/vacancies/116281\n\n\n👉 KANALGA HOZIROQ OBUNA BO'LING:\n🔗 https://t.me/karyerauznamangan",
+   "entities": [
+    {
+     "offset": 3,
+     "length": 34,
+     "type": "bold"
+    },
+    {
+     "offset": 387,
+     "length": 10,
+     "type": "url"
+    },
+    {
+     "offset": 455,
+     "length": 35,
+     "type": "url"
+    },
+    {
+     "offset": 496,
+     "length": 30,
+     "type": "bold"
+    },
+    {
+     "offset": 530,
+     "length": 30,
+     "type": "url"
+    }
+   ],
+   "v": {
+    "id": 116281,
+    "url": "https://osonish.uz/vacancies/116281",
+    "kasb": "Musiqa fanidan maktab o'qituvchisi",
+    "slots": 1,
+    "experience": "1-3 yil",
+    "pay_form": "Oylik",
+    "employment": "Doimiy (shtat asosida)",
+    "mode": "Odatiy (ish joyida)",
+    "schedule": "6/1",
+    "education": "Oliy(bakalavr)",
+    "gender": "Ahamiyatsiz",
+    "address": "Наманганская область, Туракурганский район, махаллинский сход граждан Хужанд, улица Кулховуз, 34",
+    "title": "Musiqa fanidan maktab o'qituvchisi",
+    "org": "\"to'raqo'rg'on Tuman Maktabgacha Va Maktab Ta'limi Bo'limiga Qarashli 20-Sonli Umumiy O'rta Ta'lim Maktabi\" Davlat Muassasasi",
+    "district": "To'raqo'rg'on tumani",
+    "salary": "1 500 000 so'm",
+    "phones": [],
+    "contact_name": "",
+    "date": "10.10.2026",
+    "is_region": true
+   }
+  }
+ },
  "awaiting": {}
 }
