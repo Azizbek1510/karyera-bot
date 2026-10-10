@@ -174,13 +174,7 @@ def on_message(st, m):
 
 # ---------- 2. Yangi vakansiyalar ----------
 def scrape(st):
-    ids = osonish.sitemap_ids()
-    if not ids:
-        return
-    if st["last_id"] is None:
-        todo = ids[-INITIAL_SCAN:]
-    else:
-        todo = [i for i in ids if i > st["last_id"]]
+    todo = osonish.new_ids(st["last_id"], INITIAL_SCAN)
     todo = todo[:MAX_FETCH]
     print(f"Ko'rib chiqiladi: {len(todo)} ta e'lon")
     for vid in todo:

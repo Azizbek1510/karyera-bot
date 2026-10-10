@@ -67,6 +67,38 @@ def sitemap_ids():
     xml = _get(f"{BASE}/sitemap/vacancies.xml")
     return sorted({int(m) for m in re.findall(r"/vacancies/(\d+)</loc>", xml)})
 
+def listing_ids(stop_at=None, max_pages=15):
+    """Saytning /vacancies sahifasidan (eng yangilari birinchi) ID'larni oladi.
+    stop_at dan kichik yoki teng ID uchragach to'xtaydi."""
+    ids = set()
+    for page in range(1, max_pages + 1):
+        url = f"{BASE}/vacancies" + (f"?page={page}" if page > 1 else "")
+        try:
+            html_ = _get(url)
+        except Exception as e:
+            print(f"Ro'yxat sahifasi {page}: xato ({e})")
+            break
+        found = {int(x) for x in re.findall(r"/vacancies/(\d+)", html_)}
+        new = found - ids
+        if not new:
+            break
+        ids |= new
+        if stop_at is not None and min(found) <= stop_at:
+            break
+    return sorted(ids)
+
+def new_ids(last_id=None, initial=300):
+    """Yangi e'lonlar: avval vakansiyalar sahifasidan, keyin sitemap'dan (zaxira)."""
+    ids = set(listing_ids(stop_at=last_id, max_pages=15 if last_id else max(1, initial // 15)))
+    try:
+        ids |= set(sitemap_ids())
+    except Exception as e:
+        print(f"Sitemap: xato ({e})")
+    ids = sorted(ids)
+    if last_id is None:
+        return ids[-initial:]
+    return [i for i in ids if i > last_id]
+
 def _clean(s):
     return re.sub(r"\s+", " ", s or "").strip()
 
