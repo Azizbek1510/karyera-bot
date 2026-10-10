@@ -1,6 +1,6 @@
 {
  "last_id": 116281,
- "offset": 596549671,
+ "offset": 596549687,
  "posts": {
   "116281": {
    "msg_id": 9,
@@ -58,5 +58,21 @@
    }
   }
  },
- "awaiting": {}
+ "awaiting": {},
+ "regions": [
+  "toshkent_sh",
+  "toshkent_v",
+  "qoraqalpog",
+  "andijon",
+  "buxoro",
+  "jizzax",
+  "qashqadaryo",
+  "navoiy",
+  "namangan",
+  "samarqand",
+  "surxondaryo",
+  "sirdaryo",
+  "fargona",
+  "xorazm"
+ ]
 }
