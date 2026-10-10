@@ -1,0 +1,58 @@
+name: KaryeraUz bot
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # har 10 daqiqada (GitHub ba'zan 5-15 daqiqa kechiktiradi)
+  workflow_dispatch:          # qo'lda ishga tushirish tugmasi
+    inputs:
+      test_id:
+        description: "Faqat sinov: vakansiya ID (Telegramga yubormaydi)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+concurrency:
+  group: karyera-bot
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Botni ishga tushirish
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+          CHANNEL_ID: ${{ vars.CHANNEL_ID || '@karyerauznamangan' }}
+          INITIAL_SCAN: ${{ vars.INITIAL_SCAN || '300' }}
+          TZ: Asia/Tashkent
+        run: |
+          if [ -n "${{ github.event.inputs.test_id }}" ]; then
+            python run.py --test "${{ github.event.inputs.test_id }}"
+          else
+            python run.py
+          fi
+      - name: Sinov natijalarini saqlash
+        if: github.event.inputs.test_id != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-natija
+          path: |
+            test_*.jpg
+            test_*.html
+      - name: Holatni saqlash
+        if: always() && github.event.inputs.test_id == ''
+        run: |
+          git config user.name "karyera-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add state.json
+          git diff --cached --quiet || (git commit -m "holat yangilandi" && git push)
